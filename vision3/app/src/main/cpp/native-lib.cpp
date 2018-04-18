@@ -9,7 +9,7 @@ using namespace cv;
 
 extern "C"
 {
-void JNICALL Java_ch_hepia_iti_opencvnativeandroidstudio_MainActivity_salt(JNIEnv *env, jobject instance,
+void JNICALL Java_pl_edu_agh_vision3_MainActivity_salt(JNIEnv *env, jobject instance,
                                                                            jlong matAddrGray,
                                                                            jint nbrElem) {
     Mat &mGr = *(Mat *) matAddrGray;
