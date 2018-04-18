@@ -30,6 +30,8 @@
 #ifndef OPENCV_FLANN_AUTOTUNED_INDEX_H_
 #define OPENCV_FLANN_AUTOTUNED_INDEX_H_
 
+#include <sstream>
+
 #include "general.h"
 #include "nn_index.h"
 #include "ground_truth.h"
@@ -81,6 +83,7 @@ public:
         memory_weight_ = get_param(params, "memory_weight", 0.0f);
         sample_fraction_ = get_param(params,"sample_fraction", 0.1f);
         bestIndex_ = NULL;
+        speedup_ = 0;
     }
 
     AutotunedIndex(const AutotunedIndex&);
@@ -274,7 +277,7 @@ private:
     //    struct KMeansSimpleDownhillFunctor {
     //
     //        Autotune& autotuner;
-    //        KMeansSimpleDownhillFunctor(Autotune& autotuner_) : autotuner(autotuner_) {};
+    //        KMeansSimpleDownhillFunctor(Autotune& autotuner_) : autotuner(autotuner_) {}
     //
     //        float operator()(int* params) {
     //
@@ -299,7 +302,7 @@ private:
     //    struct KDTreeSimpleDownhillFunctor {
     //
     //        Autotune& autotuner;
-    //        KDTreeSimpleDownhillFunctor(Autotune& autotuner_) : autotuner(autotuner_) {};
+    //        KDTreeSimpleDownhillFunctor(Autotune& autotuner_) : autotuner(autotuner_) {}
     //
     //        float operator()(int* params) {
     //            float maxFloat = numeric_limits<float>::max();
@@ -377,6 +380,7 @@ private:
         // evaluate kdtree for all parameter combinations
         for (size_t i = 0; i < FLANN_ARRAY_LEN(testTrees); ++i) {
             CostData cost;
+            cost.params["algorithm"] = FLANN_INDEX_KDTREE;
             cost.params["trees"] = testTrees[i];
 
             evaluate_kdtree(cost);
