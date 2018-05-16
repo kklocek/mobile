@@ -31,12 +31,24 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 
+import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
+
 public class MainActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2 {
 
     private static final String TAG = "OCVSample::Activity";
     private static final int FRONT_CAMERA_INDEX = 1;
     private CameraBridgeViewBase _cameraBridgeViewBase;
     private TextView mTextView;
+    private TensorFlowInferenceInterface inferenceInterface;
+    static {
+        System.loadLibrary("tensorflow_inference");
+    }
+
+    private static final String MODEL_FILE = "file:///android_asset/sight_vector_model.pb";
+    private static final String INPUT_NODE = "I";
+    private static final String OUTPUT_NODE = "O";
+
+    private static final int[] INPUT_SIZE = {35,55};
 
     private BaseLoaderCallback _baseLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -115,6 +127,9 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         _cameraBridgeViewBase.setVisibility(SurfaceView.VISIBLE);
         _cameraBridgeViewBase.setCameraIndex(FRONT_CAMERA_INDEX);
         _cameraBridgeViewBase.setCvCameraViewListener(this);
+
+        inferenceInterface = new TensorFlowInferenceInterface();
+        inferenceInterface.initializeTensorFlow(getAssets(), MODEL_FILE);
 
 //        this._faceCascade = this.getResources().getRopenRawResource(R.raw.haarcascade_frontalface_default);
 //        this._faceDetector = new CascadeClassifier( mCascadeFile.getAbsolutePath() );
@@ -292,6 +307,21 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
                                 new Scalar(0, 255, 255, 255),
                                 2);
                     }
+
+
+                    // running recognition
+                    double[] inputFloats = new double[35*55];
+
+                    for (int i = 0; i < 33; i++) {
+                        for (int j = 0; j < 55; j++) {
+                            inputFloats[i * 35 + j] = faceMat.get(biggestRec.x + i, biggestRec.y + j)[0];// getting gray
+                        }
+                    }
+
+                    inferenceInterface.fillNodeDouble(INPUT_NODE, INPUT_SIZE, inputFloats);
+                    inferenceInterface.runInference(new String[] {OUTPUT_NODE});
+                    float[] resu = {0, 0};
+                    inferenceInterface.readNodeFloat(OUTPUT_NODE, resu);
 
                 }
             }
