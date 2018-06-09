@@ -24,14 +24,14 @@ import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.objdetect.CascadeClassifier;
+import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.FloatBuffer;
 import java.util.List;
-
-import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
 
 public class MainActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2 {
 
@@ -45,10 +45,10 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     }
 
     private static final String MODEL_FILE = "file:///android_asset/sight_vector_model.pb";
-    private static final String INPUT_NODE = "I";
-    private static final String OUTPUT_NODE = "O";
+    private static final String INPUT_NODE = "input_2";
+    private static final String OUTPUT_NODE = "output_node0";
 
-    private static final int[] INPUT_SIZE = {35,55};
+    private static final int[] INPUT_SIZE = {35,55,1};
 
     private BaseLoaderCallback _baseLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -231,7 +231,9 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     }
 
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-        Mat matGray = inputFrame.gray();
+        Mat legsUpsideMatGray = inputFrame.gray();  // ;D
+        Mat matGray = new Mat();
+        Core.rotate(legsUpsideMatGray, matGray, Core.ROTATE_180);
         try {
             // salt(matGray.getNativeObjAddr(), 2000);
             MatOfRect matOfRect = new MatOfRect();
@@ -246,6 +248,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
                     faceRec = r;
                 }
             }
+
             this.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
@@ -318,59 +321,27 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
                         }
                     }
 
-                    inferenceInterface.fillNodeDouble(INPUT_NODE, INPUT_SIZE, inputFloats);
-                    inferenceInterface.runInference(new String[] {OUTPUT_NODE});
-                    float[] resu = {0, 0};
-                    inferenceInterface.readNodeFloat(OUTPUT_NODE, resu);
-
+//                    inferenceInterface.fillNodeDouble(INPUT_NODE, INPUT_SIZE, inputFloats);
+//                    inferenceInterface.runInference(new String[] {OUTPUT_NODE});
+//                    float[] resu = {0, 0};
+////                    FloatBuffer fb = new FloatBuffer() {
+////                    }
+//                    FloatBuffer fb = FloatBuffer.allocate(2);
+//                    inferenceInterface.readNodeFloat(OUTPUT_NODE, resu);
+//                    System.out.println("");
+                    // Konrad Klocek face access rights ok - # GDPR Compliant
                 }
             }
 
-//        for (Rect rect : rects) {
-//            Imgproc.rectangle(matGray,
-//                    new Point(rect.y, rect.x),
-//                    new Point(rect.y + rect.height, rect.x + rect.width),
-//                    new Scalar(0, 255, 0, 255),
-//                    5);
-//        }
 
-//        Mat matOut = new Mat();
-//        Core.rotate(matGray, matOut, Core.ROTATE_90_COUNTERCLOCKWISE);
-//        Core.transpose(matGray, matOut);
         } catch (Exception e) {
             Log.e(TAG, "Failed detection: " + e.getMessage(), e);
         }
+
+
         return matGray;
     }
 
 
     public native void salt(long matAddrGray, int nbrElem);
 }
-
-//import android.support.v7.app.AppCompatActivity;
-//import android.os.Bundle;
-//import android.widget.TextView;
-//
-//public class MainActivity extends AppCompatActivity {
-//
-//    // Used to load the 'native-lib' library on application startup.
-//    static {
-//        System.loadLibrary("native-lib");
-//    }
-//
-//    @Override
-//    protected void onCreate(Bundle savedInstanceState) {
-//        super.onCreate(savedInstanceState);
-//        setContentView(R.layout.activity_main);
-//
-//        // Example of a call to a native method
-//        TextView tv = (TextView) findViewById(R.id.sample_text);
-//        tv.setText(stringFromJNI());
-//    }
-//
-//    /**
-//     * A native method that is implemented by the 'native-lib' native library,
-//     * which is packaged with this application.
-//     */
-//    public native String stringFromJNI();
-//}
