@@ -288,45 +288,32 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
                         }
                     }
 
-                    Imgproc.rectangle(matGray,
-                            new Point(faceRec.y + biggestRec.y, faceRec.x + biggestRec.x),
-                            new Point(faceRec.y + biggestRec.y + biggestRec.height, faceRec.x + biggestRec.x + biggestRec.width),
+                    Imgproc.circle(matGray,
+                            new Point(faceRec.y + biggestRec.y + (biggestRec.height/2), faceRec.x + biggestRec.x + (biggestRec.width/2)),
+                            (biggestRec.height + biggestRec.width)/4,
                             new Scalar(0, 255, 255, 255),
                             2);
+//                    Imgproc.rectangle(matGray,
+//                            new Point(faceRec.y + biggestRec.y, faceRec.x + biggestRec.x),
+//                            new Point(faceRec.y + biggestRec.y + biggestRec.height, faceRec.x + biggestRec.x + biggestRec.width),
+//                            new Scalar(0, 255, 255, 255),
+//                            2);
+
+                    runRecognition(faceMat, faceRec, biggestRec, matGray);
 
                     if (secondBiggestRec != null) {
-                        Imgproc.rectangle(matGray,
-                                new Point(faceRec.y + secondBiggestRec.y, faceRec.x + secondBiggestRec.x),
-                                new Point(faceRec.y + secondBiggestRec.y + secondBiggestRec.height, faceRec.x + secondBiggestRec.x + secondBiggestRec.width),
+                        Imgproc.circle(matGray,
+                                new Point(faceRec.y + secondBiggestRec.y + (secondBiggestRec.height/2), faceRec.x + secondBiggestRec.x + (secondBiggestRec.width/2)),
+                                (secondBiggestRec.height + secondBiggestRec.width)/4,
                                 new Scalar(0, 255, 255, 255),
                                 2);
+//                        Imgproc.rectangle(matGray,
+//                                new Point(faceRec.y + secondBiggestRec.y, faceRec.x + secondBiggestRec.x),
+//                                new Point(faceRec.y + secondBiggestRec.y + secondBiggestRec.height, faceRec.x + secondBiggestRec.x + secondBiggestRec.width),
+//                                new Scalar(0, 255, 255, 255),
+//                                1);
+                        runRecognition(faceMat, faceRec, secondBiggestRec, matGray);
                     }
-
-
-                    // running recognition
-                    float[] inputFloats = new float[35 * 55];
-
-                    for (int i = 0; i < 33; i++) {
-                        for (int j = 0; j < 55; j++) {
-                            inputFloats[i * 35 + j] = (float) faceMat.get(biggestRec.x + i, biggestRec.y + j)[0];// getting gray
-                        }
-                    }
-
-                    inferenceInterface.fillNodeFloat(INPUT_NODE, INPUT_SIZE, inputFloats);
-                    inferenceInterface.runInference(new String[]{OUTPUT_NODE});
-                    float[] resu = {0, 0};
-//                    FloatBuffer fb = new FloatBuffer() {
-//                    }
-                    final FloatBuffer fb = FloatBuffer.allocate(2);
-                    inferenceInterface.readNodeFloat(OUTPUT_NODE, resu);
-
-                    this.runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            String text = "Direction: [" + fb.get(0) + ", " + fb.get(0) + "]";
-                            mBottomTextView.setText(text);
-                        }
-                    });
                 }
             }
 
@@ -337,6 +324,61 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
 
 
         return matGray;
+    }
+
+    private void runRecognition(Mat inFaceMat, Rect faceRec, Rect eyeRec, Mat outputMatGray) {
+        Mat faceMat = inFaceMat;//new Mat();
+//        Core.normalize(faceMat, faceMat);
+        // running recognition
+        int width = 35;
+        int height = 55;
+        float[] inputFloats = new float[width * height];
+
+        for (int i = 0; i < width; i++) {
+            for (int j = 0; j < height; j++) {
+                inputFloats[i * width + j] = (float) (faceMat.get(eyeRec.x + i, eyeRec.y + j)[0]/255.0);// getting gray
+            }
+        }
+
+        inferenceInterface.fillNodeFloat(INPUT_NODE, INPUT_SIZE, inputFloats);
+//        inferenceInterface.fillNodeFloat(INPUT_NODE, INPUT_SIZE, inputFloats);
+        inferenceInterface.runInference(new String[]{OUTPUT_NODE});
+//                    final float[] resu = {0, 0};
+        final FloatBuffer fb = FloatBuffer.allocate(2);
+        inferenceInterface.readNodeIntoFloatBuffer(OUTPUT_NODE, fb);
+
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                String text = "Direction: [" + fb.get(0) + ", " + fb.get(1) + "]";
+                mBottomTextView.setText(text);
+            }
+        });
+
+        Point point = computeCircleCenter(faceRec, eyeRec, fb);
+        double promotion = (Math.abs(fb.get(1)) + Math.abs(fb.get(0)))/2;
+        Imgproc.circle(outputMatGray,
+                point,
+                (int) (1 + (promotion * 4)),
+                new Scalar(255, 255, 255, 255),
+                (int) (1 + (promotion * 10)));
+        Imgproc.circle(outputMatGray,
+                point,
+                10,
+                new Scalar(255, 255, 255, 255),
+                1);
+    }
+
+    private Point computeCircleCenter(Rect faceRec, Rect rec, FloatBuffer fb) {
+        int bigCenterX = faceRec.y + rec.y + (rec.height/2);
+        int bigCenterY = faceRec.x + rec.x + (rec.width/2);
+        double radius = Math.pow((rec.height + rec.width)/4, 2);
+        double x = Math.sqrt(radius/(1 + Math.pow(fb.get(1)/fb.get(0) , 2)));
+        if (fb.get(0) < 0) {
+            x*= -1;
+        }
+        double y = (int) (fb.get(1) / fb.get(0) * x);
+        return new Point(bigCenterX + x, bigCenterY + y);
     }
 
 
