@@ -39,7 +39,9 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     private static final int FRONT_CAMERA_INDEX = 1;
     private CameraBridgeViewBase _cameraBridgeViewBase;
     private TextView mTextView;
+    private TextView mBottomTextView;
     private TensorFlowInferenceInterface inferenceInterface;
+
     static {
         System.loadLibrary("tensorflow_inference");
     }
@@ -48,7 +50,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     private static final String INPUT_NODE = "input_2";
     private static final String OUTPUT_NODE = "output_node0";
 
-    private static final int[] INPUT_SIZE = {35,55,1};
+    private static final int[] INPUT_SIZE = {1, 35, 55, 1};
 
     private BaseLoaderCallback _baseLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -73,40 +75,40 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     private CascadeClassifier mEyeDetector;
 
     private void loadEyeCascade() {
-            // Load native library after(!) OpenCV initialization
-            // System.loadLibrary("detection_based_tracker");
+        // Load native library after(!) OpenCV initialization
+        // System.loadLibrary("detection_based_tracker");
 
-            try {
-                // load cascade file from application resources
-                InputStream is = getResources().openRawResource(R.raw.haarcascade_eye);
-                File cascadeDir = getDir("cascade", Context.MODE_PRIVATE);
-                File mCascadeFile = new File(cascadeDir, "haarcascade_eye.xml");
-                FileOutputStream os = new FileOutputStream(mCascadeFile);
+        try {
+            // load cascade file from application resources
+            InputStream is = getResources().openRawResource(R.raw.haarcascade_eye);
+            File cascadeDir = getDir("cascade", Context.MODE_PRIVATE);
+            File mCascadeFile = new File(cascadeDir, "haarcascade_eye.xml");
+            FileOutputStream os = new FileOutputStream(mCascadeFile);
 
-                byte[] buffer = new byte[4096];
-                int bytesRead;
-                while ((bytesRead = is.read(buffer)) != -1) {
-                    os.write(buffer, 0, bytesRead);
-                }
-                is.close();
-                os.close();
-
-                String path = mCascadeFile.getAbsolutePath();
-                mEyeDetector = new CascadeClassifier(path);
-                if (mEyeDetector.empty()) {
-                    Log.e(TAG, "Failed to load cascade classifier");
-                    mEyeDetector = null;
-                } else
-                    Log.i(TAG, "Loaded cascade classifier from " + mCascadeFile.getAbsolutePath());
-
-                mEyeDetector.load(path);
-
-                cascadeDir.delete();
-
-            } catch (IOException e) {
-                e.printStackTrace();
-                Log.e(TAG, "Failed to load cascade. Exception thrown: " + e);
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = is.read(buffer)) != -1) {
+                os.write(buffer, 0, bytesRead);
             }
+            is.close();
+            os.close();
+
+            String path = mCascadeFile.getAbsolutePath();
+            mEyeDetector = new CascadeClassifier(path);
+            if (mEyeDetector.empty()) {
+                Log.e(TAG, "Failed to load cascade classifier");
+                mEyeDetector = null;
+            } else
+                Log.i(TAG, "Loaded cascade classifier from " + mCascadeFile.getAbsolutePath());
+
+            mEyeDetector.load(path);
+
+            cascadeDir.delete();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            Log.e(TAG, "Failed to load cascade. Exception thrown: " + e);
+        }
     }
 
     private CascadeClassifier mFaceDetector;
@@ -118,6 +120,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_main);
         mTextView = findViewById(R.id.info);
+        mBottomTextView = findViewById(R.id.orientation_text);
         // Permissions for Android 6+
         ActivityCompat.requestPermissions(MainActivity.this,
                 new String[]{Manifest.permission.CAMERA},
@@ -130,17 +133,9 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
 
         inferenceInterface = new TensorFlowInferenceInterface();
         inferenceInterface.initializeTensorFlow(getAssets(), MODEL_FILE);
-
-//        this._faceCascade = this.getResources().getRopenRawResource(R.raw.haarcascade_frontalface_default);
-//        this._faceDetector = new CascadeClassifier( mCascadeFile.getAbsolutePath() );
-//        //must add this line
-//        _faceDetector.load( mCascadeFile.getAbsolutePath() );
     }
 
     private void loadFaceCascade() {
-        // Load native library after(!) OpenCV initialization
-        // System.loadLibrary("detection_based_tracker");
-
         try {
             // load cascade file from application resources
             InputStream is = getResources().openRawResource(R.raw.haarcascade_frontalface_default);
@@ -197,20 +192,13 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
         switch (requestCode) {
             case 1: {
-                // If request is cancelled, the result arrays are empty.
                 if (grantResults.length > 0
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    // permission was granted, yay! Do the
-                    // contacts-related task you need to do.
                 } else {
-                    // permission denied, boo! Disable the
-                    // functionality that depends on this permission.
                     Toast.makeText(MainActivity.this, "Permission denied to read your External storage", Toast.LENGTH_SHORT).show();
                 }
                 return;
             }
-            // other 'case' lines to check for other
-            // permissions this app might request
         }
     }
 
@@ -286,13 +274,16 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
                     Rect biggestRec = null;
                     Rect secondBiggestRec = null;
                     for (Rect r : eyeRects) {
+                        if (r.area() > 0.3 * faceRec.area()) {
+                            continue;
+                        }
                         if (r.area() > biggestSize) {
                             secondBiggestRec = biggestRec;
                             biggestRec = r;
                             secondBiggestSize = biggestSize;
                             biggestSize = r.area();
                         } else if (r.area() > secondBiggestSize) {
-                            secondBiggestRec = faceRec;
+                            secondBiggestRec = r;
                             secondBiggestSize = r.area();
                         }
                     }
@@ -313,23 +304,29 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
 
 
                     // running recognition
-                    double[] inputFloats = new double[35*55];
+                    float[] inputFloats = new float[35 * 55];
 
                     for (int i = 0; i < 33; i++) {
                         for (int j = 0; j < 55; j++) {
-                            inputFloats[i * 35 + j] = faceMat.get(biggestRec.x + i, biggestRec.y + j)[0];// getting gray
+                            inputFloats[i * 35 + j] = (float) faceMat.get(biggestRec.x + i, biggestRec.y + j)[0];// getting gray
                         }
                     }
 
-//                    inferenceInterface.fillNodeDouble(INPUT_NODE, INPUT_SIZE, inputFloats);
-//                    inferenceInterface.runInference(new String[] {OUTPUT_NODE});
-//                    float[] resu = {0, 0};
-////                    FloatBuffer fb = new FloatBuffer() {
-////                    }
-//                    FloatBuffer fb = FloatBuffer.allocate(2);
-//                    inferenceInterface.readNodeFloat(OUTPUT_NODE, resu);
-//                    System.out.println("");
-                    // Konrad Klocek face access rights ok - # GDPR Compliant
+                    inferenceInterface.fillNodeFloat(INPUT_NODE, INPUT_SIZE, inputFloats);
+                    inferenceInterface.runInference(new String[]{OUTPUT_NODE});
+                    float[] resu = {0, 0};
+//                    FloatBuffer fb = new FloatBuffer() {
+//                    }
+                    final FloatBuffer fb = FloatBuffer.allocate(2);
+                    inferenceInterface.readNodeFloat(OUTPUT_NODE, resu);
+
+                    this.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            String text = "Direction: [" + fb.get(0) + ", " + fb.get(0) + "]";
+                            mBottomTextView.setText(text);
+                        }
+                    });
                 }
             }
 

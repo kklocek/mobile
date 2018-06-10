@@ -17,11 +17,22 @@
         android:text="IMAGE STATS"
         android:layout_height="wrap_content"
         android:minHeight="15dp"/>
+    <TextView
+        android:id="@+id/orientation_text"
+        android:layout_below="@id/info"
+        android:paddingBottom="10dp"
+        android:background="@android:color/holo_blue_dark"
+        android:layout_width="match_parent"
+        android:textColor="@android:color/black"
+        android:text="EYE DIRECTION STATS"
+        android:layout_height="wrap_content"
+        android:minHeight="15dp"/>
     <org.opencv.android.JavaCameraView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_centerInParent="true"
-        android:layout_below="@id/info"
+        android:layout_below="@id/orientation_text"
         android:id="@+id/main_surface" />
     <!--android:minHeight="500dp"-->
+
 </RelativeLayout>
