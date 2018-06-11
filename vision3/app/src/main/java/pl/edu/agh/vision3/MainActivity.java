@@ -225,12 +225,13 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         Mat legsUpsideMatGray = inputFrame.gray();  // ;D
         Mat matGray = new Mat();
         Core.rotate(legsUpsideMatGray, matGray, Core.ROTATE_180);
-//        if (counter.getAndIncrement() > 3) {
-//            counter.set(0);
-//            return matGray;
-//        }
+        if (counter.getAndIncrement() > 3) {
+            counter.set(0);
+            Mat targetGray = new Mat();
+            Core.rotate(matGray, targetGray, Core.ROTATE_180);
+            return targetGray;
+        }
         try {
-            // salt(matGray.getNativeObjAddr(), 2000);
             MatOfRect matOfRect = new MatOfRect();
             mFaceDetector.detectMultiScale(matGray.t(), matOfRect);
 
@@ -255,7 +256,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
                                 + rects.get(0).height + "]";
                         mTextView.setText(text);
                     } else {
-                        mTextView.setText("Shit, no faces.");
+                        mTextView.setText("No faces found, Sir.");
                     }
                 }
             });
@@ -275,6 +276,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
 
                 final List<Rect> eyeRects = eyeMatOfRect.toList();
 
+                FloatBuffer fb1 = null, fb2 = null;
                 if (eyeRects != null && eyeRects.size() > 0) {
                     double biggestSize = 0;
                     double secondBiggestSize = 0;
@@ -295,13 +297,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
                         }
                     }
 
-//                    Imgproc.rectangle(matGray,
-//                            new Point(faceRec.y + biggestRec.y, faceRec.x + biggestRec.x),
-//                            new Point(faceRec.y + biggestRec.y + biggestRec.height, faceRec.x + biggestRec.x + biggestRec.width),
-//                            new Scalar(0, 255, 255, 255),
-//                            2);
-
-                    Mat out = runRecognition(faceMat, faceRec, biggestRec, matGray);
+                    fb1 = runRecognition(faceMat, faceRec, biggestRec, matGray);
 
                     Imgproc.circle(matGray,
                             new Point(faceRec.y + biggestRec.y + (biggestRec.height/2), faceRec.x + biggestRec.x + (biggestRec.width/2)),
@@ -309,26 +305,37 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
                             new Scalar(0, 255, 255, 255),
                             2);
 
-//                    Size s = matGray.size();
-//                    Mat newOut = new Mat();
-//                    Imgproc.resize(out, newOut, s);
-//                    matGray = newOut;
-
 
                     if (secondBiggestRec != null) {
-                        runRecognition(faceMat, faceRec, secondBiggestRec, matGray);
+                        fb2 = runRecognition(faceMat, faceRec, secondBiggestRec, matGray);
                         Imgproc.circle(matGray,
                                 new Point(faceRec.y + secondBiggestRec.y + (secondBiggestRec.height/2), faceRec.x + secondBiggestRec.x + (secondBiggestRec.width/2)),
                                 (secondBiggestRec.height + secondBiggestRec.width)/4,
                                 new Scalar(0, 255, 255, 255),
                                 2);
-//                        Imgproc.rectangle(matGray,
-//                                new Point(faceRec.y + secondBiggestRec.y, faceRec.x + secondBiggestRec.x),
-//                                new Point(faceRec.y + secondBiggestRec.y + secondBiggestRec.height, faceRec.x + secondBiggestRec.x + secondBiggestRec.width),
-//                                new Scalar(0, 255, 255, 255),
-//                                1);
                     }
                 }
+
+                final FloatBuffer finalFb = fb1;
+                final FloatBuffer finalFb1 = fb2;
+                this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        String text;
+                        if (finalFb != null || finalFb1 != null) {
+                            text = "Eye vectors, Sir: ";
+                            if (finalFb != null) {
+                                text += "[" + finalFb.get(1) + ", " + finalFb.get(0) + "] ";
+                            }
+                            if (finalFb1 != null) {
+                                text += "[" + finalFb1.get(1) + ", " + finalFb1.get(0) + "] ";
+                            }
+                        } else {
+                            text = "No vectors, Sir.";
+                        }
+                        mBottomTextView.setText(text);
+                    }
+                });
             }
 
 
@@ -336,10 +343,12 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
             Log.e(TAG, "Failed detection: " + e.getMessage(), e);
         }
 
-        return matGray;
+        Mat targetGray = new Mat();
+        Core.rotate(matGray, targetGray, Core.ROTATE_180);
+        return targetGray;
     }
 
-    private Mat runRecognition(Mat inFaceMat, Rect faceRec, Rect eyeRec, Mat outputMatGray) {
+    private FloatBuffer runRecognition(Mat inFaceMat, Rect faceRec, Rect eyeRec, Mat outputMatGray) {
         Mat faceMat = inFaceMat.t();//new Mat();
         Mat rawEyeMat = faceMat.submat(eyeRec);
         Mat eyeMat = new Mat();
@@ -2300,14 +2309,6 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         final FloatBuffer fb = FloatBuffer.allocate(2);
         inferenceInterface.readNodeIntoFloatBuffer(OUTPUT_NODE, fb);
 
-        this.runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                String text = "Direction: [" + fb.get(1) + ", " + fb.get(0) + "]";
-                mBottomTextView.setText(text);
-            }
-        });
-
         fb.put(1, -fb.get(1));
         Point point = computeCircleCenter(faceRec, eyeRec, fb);
         Point target = new Point();
@@ -2337,7 +2338,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
 //                (int) (1 + (promotion * 16)),
 //                new Scalar(255, 255, 255, 255),
 //                (int) (1 + (promotion * 18)));
-        return eyeMat;
+        return fb;
     }
 
     private Point computeCircleCenter(Rect faceRec, Rect rec, FloatBuffer fb) {
