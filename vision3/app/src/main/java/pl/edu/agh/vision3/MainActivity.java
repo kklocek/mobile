@@ -220,17 +220,10 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     public void onCameraViewStopped() {
     }
 
-    AtomicInteger counter = new AtomicInteger();
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         Mat legsUpsideMatGray = inputFrame.gray();  // ;D
         Mat matGray = new Mat();
         Core.rotate(legsUpsideMatGray, matGray, Core.ROTATE_180);
-        if (counter.getAndIncrement() > 3) {
-            counter.set(0);
-            Mat targetGray = new Mat();
-            Core.rotate(matGray, targetGray, Core.ROTATE_180);
-            return targetGray;
-        }
         try {
             MatOfRect matOfRect = new MatOfRect();
             mFaceDetector.detectMultiScale(matGray.t(), matOfRect);
@@ -323,15 +316,16 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
                     public void run() {
                         String text;
                         if (finalFb != null || finalFb1 != null) {
-                            text = "Eye vectors, Sir: ";
+                            text = "Eye vectors, Sir: \n";
                             if (finalFb != null) {
                                 text += "[" + finalFb.get(1) + ", " + finalFb.get(0) + "] ";
                             }
+                            text+= "\n";
                             if (finalFb1 != null) {
                                 text += "[" + finalFb1.get(1) + ", " + finalFb1.get(0) + "] ";
                             }
                         } else {
-                            text = "No vectors, Sir.";
+                            text = "No vectors, Sir.\n\n";
                         }
                         mBottomTextView.setText(text);
                     }
