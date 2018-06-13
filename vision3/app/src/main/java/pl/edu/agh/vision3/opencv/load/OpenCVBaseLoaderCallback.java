@@ -4,29 +4,44 @@ import android.content.Context;
 import android.util.Log;
 
 import org.opencv.android.BaseLoaderCallback;
-import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.objdetect.CascadeClassifier;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 
 import pl.edu.agh.vision3.R;
+import pl.edu.agh.vision3.opencv.ICameraViewConnector;
 import pl.edu.agh.vision3.opencv.IOpenCvLoadedListener;
 
+/**
+ * Open CV loader callback. Main mathod is invoked after OpenCV is loaded.
+ */
 public class OpenCVBaseLoaderCallback extends BaseLoaderCallback {
     private static final String TAG = "OpenCvLoaderCallback";
-    private final CameraBridgeViewBase cameraBridgeViewBase;
-    private final IOpenCvLoadedListener iOpenCvLoadedListener;
 
-    public OpenCVBaseLoaderCallback(Context AppContext, CameraBridgeViewBase _cameraBridgeViewBase, IOpenCvLoadedListener iOpenCvLoadedListener) {
+    private static final String FRONT_FACE_CASCADE_FILE_NAME = "haarcascade_frontalface_default.xml";
+    private static final String EYE_CASCADE_FILE_NAME = "haarcascade_eye.xml";
+    private static final String CASCADE_DIR_NAME = "cascade";
+
+    private final IOpenCvLoadedListener iOpenCvLoadedListener;
+    private final ICameraViewConnector iCameraViewConnector;
+    private int READ_BUFFER_SIZE = 4096;
+
+    public OpenCVBaseLoaderCallback(Context AppContext,
+                                    IOpenCvLoadedListener iOpenCvLoadedListener,
+                                    ICameraViewConnector iCameraViewConnector) {
         super(AppContext);
-        cameraBridgeViewBase = _cameraBridgeViewBase;
         this.iOpenCvLoadedListener = iOpenCvLoadedListener;
+        this.iCameraViewConnector = iCameraViewConnector;
     }
 
+    /**
+     * Loads native libraries and eye/face cascades. Enables camera view.
+     *
+     * @param status loading status
+     */
     @Override
     public void onManagerConnected(int status) {
         switch (status) {
@@ -35,7 +50,7 @@ public class OpenCVBaseLoaderCallback extends BaseLoaderCallback {
                 System.loadLibrary("native-lib");
                 iOpenCvLoadedListener.onFaceDetecitonCascadeLoaded(loadFaceCascade());
                 iOpenCvLoadedListener.onEyeDetectionCascadeLoaded(loadEyeCascade());
-                cameraBridgeViewBase.enableView();
+                iCameraViewConnector.getCameraBridgeView().enableView();
             }
             break;
             default: {
@@ -45,54 +60,22 @@ public class OpenCVBaseLoaderCallback extends BaseLoaderCallback {
     }
 
     private CascadeClassifier loadFaceCascade() {
-        try {
-            // load cascade file from application resources
-            InputStream is = this.mAppContext.getResources().openRawResource(R.raw.haarcascade_frontalface_default);
-            File cascadeDir = this.mAppContext.getDir("cascade", Context.MODE_PRIVATE);
-            File mCascadeFile = new File(cascadeDir, "haarcascade_frontalface_default.xml");
-            FileOutputStream os = new FileOutputStream(mCascadeFile);
-
-            byte[] buffer = new byte[4096];
-            int bytesRead;
-            while ((bytesRead = is.read(buffer)) != -1) {
-                os.write(buffer, 0, bytesRead);
-            }
-            is.close();
-            os.close();
-
-            String path = mCascadeFile.getAbsolutePath();
-            CascadeClassifier mFaceDetector = new CascadeClassifier(path);
-            if (mFaceDetector.empty()) {
-                Log.e(TAG, "Failed to load cascade classifier");
-                mFaceDetector = null;
-            } else
-                Log.i(TAG, "Loaded cascade classifier from " + mCascadeFile.getAbsolutePath());
-
-            mFaceDetector.load(path);
-
-            cascadeDir.delete();
-
-            return mFaceDetector;
-        } catch (IOException e) {
-            e.printStackTrace();
-            Log.e(TAG, "Failed to load cascade. Exception thrown: " + e);
-        }
-        return null;
-
+        return loadCascade(R.raw.haarcascade_frontalface_default, FRONT_FACE_CASCADE_FILE_NAME);
     }
 
     private CascadeClassifier loadEyeCascade() {
-        // Load native library after(!) OpenCV initialization
-        // System.loadLibrary("detection_based_tracker");
+        return loadCascade(R.raw.haarcascade_eye, EYE_CASCADE_FILE_NAME);
+    }
 
+    private CascadeClassifier loadCascade(int resourceId, String cascadeFileName) {
         try {
             // load cascade file from application resources
-            InputStream is = this.mAppContext.getResources().openRawResource(R.raw.haarcascade_eye);
-            File cascadeDir = this.mAppContext.getDir("cascade", Context.MODE_PRIVATE);
-            File mCascadeFile = new File(cascadeDir, "haarcascade_eye.xml");
+            InputStream is = this.mAppContext.getResources().openRawResource(resourceId);
+            File cascadeDir = this.mAppContext.getDir(CASCADE_DIR_NAME, Context.MODE_PRIVATE);
+            File mCascadeFile = new File(cascadeDir, cascadeFileName);
             FileOutputStream os = new FileOutputStream(mCascadeFile);
 
-            byte[] buffer = new byte[4096];
+            byte[] buffer = new byte[READ_BUFFER_SIZE];
             int bytesRead;
             while ((bytesRead = is.read(buffer)) != -1) {
                 os.write(buffer, 0, bytesRead);
@@ -101,19 +84,19 @@ public class OpenCVBaseLoaderCallback extends BaseLoaderCallback {
             os.close();
 
             String path = mCascadeFile.getAbsolutePath();
-            CascadeClassifier mEyeDetector = new CascadeClassifier(path);
-            if (mEyeDetector.empty()) {
+            CascadeClassifier detector = new CascadeClassifier(path);
+            if (detector.empty()) {
                 Log.e(TAG, "Failed to load cascade classifier");
-                mEyeDetector = null;
+                throw new IllegalStateException("Detector " + cascadeFileName + " couldn't be loaded.");
             } else
                 Log.i(TAG, "Loaded cascade classifier from " + mCascadeFile.getAbsolutePath());
 
-            mEyeDetector.load(path);
+            detector.load(path);
 
             cascadeDir.delete();
 
-            return mEyeDetector;
-        } catch (IOException e) {
+            return detector;
+        } catch (Exception e) {
             e.printStackTrace();
             Log.e(TAG, "Failed to load cascade. Exception thrown: " + e);
         }

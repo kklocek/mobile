@@ -21,18 +21,19 @@ import org.opencv.objdetect.CascadeClassifier;
 import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
 
 import java.nio.FloatBuffer;
-import java.util.List;
 
+import pl.edu.agh.vision3.opencv.ICameraViewConnector;
 import pl.edu.agh.vision3.opencv.IOpenCvLoadedListener;
 import pl.edu.agh.vision3.opencv.load.OpenCVBaseLoaderCallback;
 import pl.edu.agh.vision3.opencv.impl.RecognitionHandler;
 import pl.edu.agh.vision3.visual.IResultsComputedListener;
 
-import static pl.edu.agh.vision3.tensorflow.TensorFlowUtils.MODEL_FILE;
-
-public class MainActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2, IOpenCvLoadedListener, IResultsComputedListener {
-
-    private static final String TAG = "OCVSample::Activity";
+public class MainActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2,
+        IOpenCvLoadedListener,
+        IResultsComputedListener,
+        ICameraViewConnector {
+    private static final String MODEL_FILE = "file:///android_asset/sight_vector_model.pb";
+    private static final String TAG = "MainAppActivity";
     private static final int FRONT_CAMERA_INDEX = 1;
     private CameraBridgeViewBase _cameraBridgeViewBase;
     private TextView mTextView;
@@ -43,7 +44,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         System.loadLibrary("tensorflow_inference");
     }
 
-    private BaseLoaderCallback _baseLoaderCallback = new OpenCVBaseLoaderCallback(this, _cameraBridgeViewBase, this);
+    private BaseLoaderCallback _baseLoaderCallback = new OpenCVBaseLoaderCallback(this, this, this);
     private CascadeClassifier mEyeDetector;
     private CascadeClassifier mFaceDetector;
 
@@ -79,12 +80,13 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     public void onResume() {
         super.onResume();
         if (!OpenCVLoader.initDebug()) {
-            Log.d(TAG, "Internal OpenCV library not found. Using OpenCV Manager for initialization");
+            Log.e(TAG, "OpenCV ::: Internal OpenCV library not found. Using OpenCV Manager for initialization");
             OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_4_0, this, _baseLoaderCallback);
         } else {
-            Log.d(TAG, "OpenCV library found inside package. Using it!");
+            Log.e(TAG, "OpenCV ::: OpenCV library found inside package. Using it!");
             _baseLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
         }
+        Log.e(TAG, "If you see this text. Loading possibly works.");
     }
 
     @Override
@@ -139,16 +141,16 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     }
 
     @Override
-    public void onFacesRecognized(final List<Rect> rects) {
+    public void onFaceRecognized(final Rect rect) {
         this.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                if (!rects.isEmpty()) {
-                    String text = "Found: " + rects.size() + " , 1st: ["
-                            + rects.get(0).y + ","
-                            + rects.get(0).x + ","
-                            + rects.get(0).width + ","
-                            + rects.get(0).height + "]";
+                if (rect != null) {
+                    String text = "Found face: ["
+                            + rect.y + ","
+                            + rect.x + ","
+                            + rect.width + ","
+                            + rect.height + "]";
                     mTextView.setText(text);
                 } else {
                     mTextView.setText("No faces found, Sir.");
@@ -178,5 +180,10 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
                 mBottomTextView.setText(text);
             }
         });
+    }
+
+    @Override
+    public CameraBridgeViewBase getCameraBridgeView() {
+        return _cameraBridgeViewBase;
     }
 }
