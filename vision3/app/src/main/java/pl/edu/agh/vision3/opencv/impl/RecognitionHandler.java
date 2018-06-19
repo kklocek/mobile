@@ -83,8 +83,10 @@ public class RecognitionHandler {
             Rect[] eyes = filterOutEyes(faceRec, eyeRects);
 
             // recognize the vector for the first eye (biggest) and visualize it
-            fb1 = recognizeVectorAndVisualize(
-                    matGray, faceMat, faceRec, eyes[0], inferenceInterface);
+            if (eyes[0] != null) {
+                fb1 = recognizeVectorAndVisualize(
+                        matGray, faceMat, faceRec, eyes[0], inferenceInterface);
+            }
 
             // recognize the vector for the second eye (second biggest) and visualize it
             if (eyes[1] != null) {
